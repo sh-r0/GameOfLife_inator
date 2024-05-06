@@ -207,7 +207,8 @@ int32_t main(int32_t _argc, char** _argv) {
 	vertices[1] =	{ 1.0,	 -1.0,		1.0,	0.0 };
 	vertices[2] =	{ 1.0,	 1.0,		1.0,	1.0 };
 	vertices[3] =	{ -1.0, 1.0,		0.0,	1.0 };
-	std::array<uint32_t, 6> indices = { 0,1,2,2,3,0 };
+	std::array<uint32_t, 6> indices; 
+	indices = { 0,1,2,2,3,0 };
 
 	uint32_t vao, vbo, ibo;
 	glGenVertexArrays(1, &vao);
@@ -227,7 +228,6 @@ int32_t main(int32_t _argc, char** _argv) {
 
 	uint32_t prevState, curState;
 	glGenTextures(1, &prevState);
-	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, prevState);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -236,14 +236,14 @@ int32_t main(int32_t _argc, char** _argv) {
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, mapSize, mapSize, 0, GL_RGBA, GL_FLOAT, NULL);
 
 	glGenTextures(1, &curState);
-	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, curState);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, mapSize, mapSize, 0, GL_RGBA, GL_FLOAT, NULL);
-	glBindImageTexture(0, curState, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+	glBindImageTexture(0, prevState, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+	glBindImageTexture(1, curState, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 
 	uint32_t shaderProgram = createShaderProgram({ GL_VERTEX_SHADER, GL_FRAGMENT_SHADER }, {"res/vertex.glsl", "res/fragment.glsl"});
 	glUseProgram(shaderProgram);
@@ -251,8 +251,7 @@ int32_t main(int32_t _argc, char** _argv) {
 
 	uint32_t computeProgram = createShaderProgram({ GL_COMPUTE_SHADER }, { "res/compute.glsl" });
 	glUseProgram(computeProgram);
-	glUniform1i(glGetUniformLocation(computeProgram, "prevState"), int32_t(0));
-	glUniform1i(glGetUniformLocation(computeProgram, "isFirst"), true);
+	glUniform1i(glGetUniformLocation(computeProgram, "isFirst"), int32_t(true));
 	glUniform1f(glGetUniformLocation(computeProgram, "mapSize"), float(mapSize));
 	glUniform1ui(glGetUniformLocation(computeProgram, "seed"), uint32_t(seed));
 	glUniform1ui(glGetUniformLocation(computeProgram, "density"), uint32_t(density));
@@ -260,10 +259,9 @@ int32_t main(int32_t _argc, char** _argv) {
 	glDispatchCompute(mapSize, mapSize, 1);
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 	
-	glUniform1i(glGetUniformLocation(computeProgram, "isFirst"), false);
+	glUniform1i(glGetUniformLocation(computeProgram, "isFirst"), int32_t(false));
 	glCopyImageSubData(curState, GL_TEXTURE_2D, 0, 0, 0, 0, prevState, GL_TEXTURE_2D, 0, 0, 0, 0, mapSize, mapSize, 1);
 
-	//glUniform1i(glGetUniformLocation(shaderProgram, "curState"), 1);
 	glClearColor(1, 1, 1, 1);
 	while (!glfwWindowShouldClose(window)) {
 		processInput(window);
