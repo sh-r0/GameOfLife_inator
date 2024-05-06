@@ -8,6 +8,24 @@
 #include <array>
 #include <vector>
 #include <cassert>
+#include <unordered_map>
+
+constexpr uint32_t windowSizeX_c = 1024, windowSizeY_c = 1024;
+constexpr const char* appName_c = "GameOfLife_inator";
+constexpr const char* helpMessage =
+"./GameOfLife_inator.exe <flags>\n"
+"flags:\n"
+"-h/-help - help flag"
+"-s/-size <value> - size of map side(map is value^2 sized)\n"
+"-d/-density <value> - density of starting map, interval(0-100)\n"
+"-seed <value> - seed of generated starting map\n";
+
+float zoom = 1.0f;
+float offsetX = 0, offsetY = 0;
+size_t mapSize;				//size of map's side -> maps size is mapSize^2 pixels
+uint16_t density, seed;
+int32_t isPressed = 0;	//which button was pressed last
+bool isPaused = false;	//is simulation going
 
 inline void readFile(const std::string& _filepath, std::string& _buff) {
 	std::ifstream inFile(_filepath);
@@ -52,14 +70,6 @@ struct vertex_t {
 	} texCoords;
 };
 
-constexpr uint32_t windowSizeX_c = 1024, windowSizeY_c = 1024;
-constexpr const char* appName_c = "GameOfLife_inator";
-
-float zoom = 1.0f;
-float offsetX = 0, offsetY= 0;
-size_t mapSize;
-bool isPaused = false;
-
 inline void clampOffset(void) {
 	if (offsetX < 0)
 		offsetX = 0;
@@ -88,7 +98,6 @@ void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
 	return;
 }
 
-int32_t isPressed = 0;
 void processInput(GLFWwindow* _window) {
 	if (glfwGetKey(_window, GLFW_KEY_LEFT) == GLFW_PRESS) {
 		if (isPressed == 0) {
@@ -143,13 +152,53 @@ void initWindow(GLFWwindow*& _window) {
 	return;
 }
 
+void dispatchArgs(int32_t _argc, char** _argv) {
+	std::unordered_map<std::string, uint32_t> map;
+	map.insert({ "-h", 0 }); map.insert({ "-help", 0 });
+	map.insert({ "-s", 1 }); map.insert({ "-size", 1 });
+	map.insert({ "-d", 2 }); map.insert({ "-density", 2 });
+	map.insert({ "-seed", 3 });
+
+	size_t i = 0;
+	while (i < _argc) {
+		if (map.find(_argv[i]) == map.end()) {
+			i++;
+			continue;
+		}
+		switch (map[_argv[i]]) {
+			case 0: {
+				printf("%s\n", helpMessage);
+				throw std::runtime_error("end!");
+			} break;
+			case 1: {
+				mapSize = std::atoi(_argv[i + 1]);
+				i += 2;
+			} break;
+			case 2: {
+				density = std::atoi(_argv[i + 1]);
+				i += 2;
+			} break;
+			case 3: {
+				seed = std::atoi(_argv[i + 1]);
+				i += 2;
+			} break;
+			default: {
+				printf("%s", _argv[i]);
+				i++;
+			}
+		};
+	}
+	return;
+}
+
 int32_t main(int32_t _argc, char** _argv) {
-	//if (_argc < 2)
-	//	return EXIT_FAILURE;
-	//
-	//mapSize = atoi(_argv[1]);
-	mapSize = 2048;
 	GLFWwindow* window;
+	mapSize = 2048;
+	density = 50;
+	srand(0);
+	seed = rand();
+	dispatchArgs(_argc, _argv);
+
 	initWindow(window);
 	glewInit();
 
@@ -166,7 +215,7 @@ int32_t main(int32_t _argc, char** _argv) {
 
 	glGenBuffers(1, &vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(vertex_t), vertices.data(), GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(vertex_t), vertices.data(), GL_STATIC_DRAW);
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vertex_t), 0);
 	glEnableVertexAttribArray(1);
@@ -174,7 +223,7 @@ int32_t main(int32_t _argc, char** _argv) {
 
 	glGenBuffers(1, &ibo);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), indices.data(), GL_DYNAMIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
 
 	uint32_t prevState, curState;
 	glGenTextures(1, &prevState);
@@ -202,9 +251,12 @@ int32_t main(int32_t _argc, char** _argv) {
 
 	uint32_t computeProgram = createShaderProgram({ GL_COMPUTE_SHADER }, { "res/compute.glsl" });
 	glUseProgram(computeProgram);
-	glUniform1i(glGetUniformLocation(computeProgram, "prevState"), 0);
+	glUniform1i(glGetUniformLocation(computeProgram, "prevState"), int32_t(0));
 	glUniform1i(glGetUniformLocation(computeProgram, "isFirst"), true);
 	glUniform1f(glGetUniformLocation(computeProgram, "mapSize"), float(mapSize));
+	glUniform1ui(glGetUniformLocation(computeProgram, "seed"), uint32_t(seed));
+	glUniform1ui(glGetUniformLocation(computeProgram, "density"), uint32_t(density));
+
 	glDispatchCompute(mapSize, mapSize, 1);
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 	
@@ -228,8 +280,6 @@ int32_t main(int32_t _argc, char** _argv) {
 		glUniform2f(glGetUniformLocation(shaderProgram, "cordsOffset"), offsetX, offsetY);
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, curState);
-		//glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(vertex_t), vertices.data());
-		//glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, indices.size() * sizeof(uint32_t), indices.data());
 		glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, nullptr);
 
 		glfwSwapBuffers(window);

@@ -5,9 +5,11 @@ layout(rgba32f, binding = 0) uniform image2D curState;
 layout(location= 0) uniform float mapSize;
 layout(location= 1) uniform sampler2D prevState;  
 layout(location= 2) uniform bool isFirst;
+layout(location= 3) uniform uint seed;
+layout(location= 4) uniform uint density;
 
-float rand(vec2 co) {
-    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+float rand(vec2 _co) {      
+    return fract(sin(dot(_co, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
 bool isAlive(void) {
@@ -28,7 +30,6 @@ bool isAlive(void) {
 }
 
 void main(void) {
-    const int seed = 1, density = 50;
     ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
     if(isFirst) {
         float val;

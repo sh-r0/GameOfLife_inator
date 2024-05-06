@@ -8,6 +8,5 @@ layout(location = 0) out vec4 outColor;
 
 void main(void) {
 	outColor = vec4(vec3(texture(curState, v_texCoords).r), 1.0f);
-	//outColor = vec4(1,0,1,1);
 	return;
 }
