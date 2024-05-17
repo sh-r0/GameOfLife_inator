@@ -87,6 +87,35 @@ inline void clampOffset(void) {
 	return;
 }
 
+uint32_t currStateTexId = UINT32_MAX;
+uint32_t prevStateTexId = UINT32_MAX;
+
+bool isMousePressed = false;
+void mousePressCallback(GLFWwindow* _window, int32_t _button, int32_t _action, int32_t _mods) {
+	if (_button != GLFW_MOUSE_BUTTON_LEFT)
+		return;
+	if (currStateTexId == UINT32_MAX) return;
+
+	double x, y;
+	glfwGetCursorPos(_window, &x, &y);
+	y = windowSizeY_c - y;
+
+	x = offsetX + x / windowSizeX_c * mapSize / zoom;
+	y = offsetY + y / windowSizeY_c * mapSize / zoom;
+
+	if (_action == GLFW_PRESS) {
+		float a = 0;
+		glTextureSubImage2D(currStateTexId, 0, int32_t(x), int32_t(y), 1, 1, GL_RGBA, GL_FLOAT, &a);
+		glTextureSubImage2D(prevStateTexId, 0, int32_t(x), int32_t(y), 1, 1, GL_RGBA, GL_FLOAT, &a);
+
+		isMousePressed = true;
+	}
+	else isMousePressed = false;
+
+
+	return;
+}
+
 void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
 	if (yoffset < 0.0f) {
 		zoom = zoom == 1.0f ? 1.0f : zoom / 2.0f;
@@ -148,6 +177,7 @@ void initWindow(GLFWwindow*& _window) {
 		throw std::runtime_error("Couldn't create window\n");
 	}
 	glfwMakeContextCurrent(_window);
+	glfwSetMouseButtonCallback(_window, mousePressCallback);
 	glfwSetScrollCallback(_window, scrollCallback);
 	return;
 }
@@ -193,7 +223,7 @@ void dispatchArgs(int32_t _argc, char** _argv) {
 
 int32_t main(int32_t _argc, char** _argv) {
 	GLFWwindow* window;
-	mapSize = 2048;
+	mapSize = 1024;
 	density = 50;
 	srand(0);
 	seed = rand();
@@ -234,7 +264,7 @@ int32_t main(int32_t _argc, char** _argv) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, mapSize, mapSize, 0, GL_RGBA, GL_FLOAT, NULL);
-
+	
 	glGenTextures(1, &curState);
 	glBindTexture(GL_TEXTURE_2D, curState);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -244,6 +274,8 @@ int32_t main(int32_t _argc, char** _argv) {
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, mapSize, mapSize, 0, GL_RGBA, GL_FLOAT, NULL);
 	glBindImageTexture(0, prevState, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 	glBindImageTexture(1, curState, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+	currStateTexId = curState;
+	prevStateTexId = prevState;
 
 	uint32_t shaderProgram = createShaderProgram({ GL_VERTEX_SHADER, GL_FRAGMENT_SHADER }, {"res/vertex.glsl", "res/fragment.glsl"});
 	glUseProgram(shaderProgram);

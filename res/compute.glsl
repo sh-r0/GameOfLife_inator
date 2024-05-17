@@ -20,8 +20,12 @@ bool isAlive(void) {
     };
     uint living = 0;
     ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
-    for(int i = 0; i < 8; i++)
+    for (int i = 0; i < 8; i++) {
+        ivec2 newCoord = texelCoord + offsets[i];
+        //in theory this will never be bigger than but w/e
+        if (newCoord.x >= mapSize || newCoord.y >= mapSize || newCoord.x < 0 || newCoord.y < 0) continue;
         if(imageLoad(prevState, (texelCoord+offsets[i])).r == 0) living++;
+    }
 
     if(living == 3) return true;
     else if((living == 2) && (imageLoad(prevState, texelCoord).r == 0)) return true;
